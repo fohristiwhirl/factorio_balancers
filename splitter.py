@@ -1,4 +1,4 @@
-import random, statistics
+import copy, random, statistics
 
 alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 test_length = 10000
@@ -36,6 +36,16 @@ class Thing:
 		other.ins.append(self)
 		return True
 
+	def disconnect_inputs(self):
+		for source in copy.copy(self.ins):
+			source.outs.remove(self)
+			self.ins.remove(source)
+
+	def disconnect_outputs(self):
+		for target in copy.copy(self.outs):
+			self.outs.remove(target)
+			target.ins.remove(self)
+
 	def inputs(self):
 		return len(self.ins)
 
@@ -59,8 +69,11 @@ class Thing:
 			return 2
 
 	def print(self):
-		if self.outputs() == 0:
-			print("{} (no outputs)".format(self.name))
+		if (not self.root) and self.inputs() == 0:
+			print("{} (x)".format(self.name))
+			return
+		if (not self.terminus) and self.outputs() == 0:
+			print("{} (no outputs)".format(self.name))		# should never be
 			return
 		print("{} --> {}".format(self.name, self.outs[0].name))
 		if self.outputs() == 2:
@@ -84,7 +97,7 @@ def main():
 		splitters.append(Thing("Splitter {}".format(alphabet[n])))
 
 	for n in range(terminus_count):
-		termini.append(Thing("(Terminus {})".format(n + 1), terminus = True))
+		termini.append(Thing("--------->".format(n + 1), terminus = True))
 
 	best_variance = None
 
@@ -93,7 +106,7 @@ def main():
 
 	while 1:
 
-		# For each run, generate the probability that a splitter will have 2 outputs...
+		# For each run, generate the probability that a splitter will try to add 2 outputs at the final phase...
 
 		two_output_chance = random.random()
 
@@ -106,9 +119,13 @@ def main():
 		# Attach roots...
 
 		for root in roots:
-			while 1:
-				if root.connect(random.choice(splitters)):
-					break
+
+			if root.name == "Root 1":
+				root.connect(splitters[0])
+			else:
+				while 1:
+					if root.connect(random.choice(splitters)):
+						break
 
 		# Attach termini...
 
@@ -125,14 +142,22 @@ def main():
 		for splitter in splitters:
 
 			if random.random() < two_output_chance:
-				num_outputs = 2
+				extra_outputs = 2
 			else:
-				num_outputs = 1
+				extra_outputs = 1
 
-			for n in range(num_outputs):
+			for n in range(extra_outputs):
+
+				# Since some outputs may already be connected to termini, we might not actually be able to add...
+
+				if splitter.outputs() == 2:
+					break
 
 				for i in range(50):
-					if splitter.connect(random.choice(splitters)):
+					target = random.choice(splitters)
+					if target in splitter.outs:			# don't connect to the same thing twice
+						continue
+					if splitter.connect(target):
 						break
 
 			if splitter.outputs() == 0:
@@ -142,9 +167,11 @@ def main():
 		if not success:
 			continue
 
+		# Run test...
+
 		scores = get_scores(roots, splitters, termini)
 
-		if scores is None:
+		if scores == None:
 			continue
 
 		pvar = statistics.pvariance(scores)
@@ -154,6 +181,16 @@ def main():
 			best_variance = pvar
 
 			print("\b" * len("Searching..."), end="", flush=True)
+
+			normalise(splitters)
+
+			# As a sanity check, test the network again.
+			# Note that there might sometimes be a slight difference caused by index positions changing.
+
+			scores2 = get_scores(roots, splitters, termini)
+			if scores != scores2:
+				print("WARNING: score divergence after normalisation:")
+				print("{}; {}".format(scores, scores2))
 
 			for root in roots:
 				root.print()
@@ -165,6 +202,46 @@ def main():
 
 			print("-------------------------------------------------------------------")
 			print("Searching...", end="", flush=True)
+
+
+def normalise(splitters):
+
+	for splitter in splitters:
+		splitter.selectindex = 0		# For determinism
+
+	while 1:
+
+		changes = False
+
+		# Fully disconnect any splitters with no inputs:
+
+		for splitter in splitters:
+			if splitter.inputs() == 0 and splitter.outputs() > 0:
+				splitter.disconnect_outputs()
+				changes = True
+
+		# If a splitter has 1 input and 1 output, it does nothing, just connect the things:
+
+		for splitter in splitters:
+
+			if splitter.inputs() == 1 and splitter.outputs() == 1:
+
+				if splitter.outs[0] == splitter:		# it's only connecting to itself.
+					splitter.disconnect_outputs()
+
+				else:
+					source = splitter.ins[0]
+					target = splitter.outs[0]
+					splitter.disconnect_inputs()
+					splitter.disconnect_outputs()
+
+					if not source.connect(target):
+						raise AssertionError
+
+				changes = True
+
+		if not changes:
+			return
 
 
 def get_scores(roots, splitters, termini):
