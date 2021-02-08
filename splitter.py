@@ -28,13 +28,10 @@ class Thing:
 			return ret
 
 	def connect(self, other):
-
 		if self.outputs() + 1 > self.max_outputs():
 			return False
-
 		if other.inputs() + 1 > other.max_inputs():
 			return False
-
 		self.outs.append(other)
 		other.ins.append(self)
 		return True
@@ -44,12 +41,6 @@ class Thing:
 
 	def outputs(self):
 		return len(self.outs)
-
-	def free_inputs(self):
-		return self.max_inputs() - len(self.ins)
-
-	def free_outputs(self):
-		return self.max_outputs() - len(self.outs)
 
 	def max_inputs(self):
 		if self.root:
@@ -68,13 +59,10 @@ class Thing:
 			return 2
 
 	def print(self):
-
 		if self.outputs() == 0:
 			print("{} (no outputs)".format(self.name))
 			return
-
 		print("{} --> {}".format(self.name, self.outs[0].name))
-
 		if self.outputs() == 2:
 			print("{} --> {}".format(" " * len(self.name), self.outs[1].name))
 
