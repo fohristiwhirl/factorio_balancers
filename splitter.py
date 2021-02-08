@@ -17,6 +17,9 @@ class Thing:
 		self.ins = []
 		self.outs = []
 
+	def reset_selector(self):
+		self.selectindex = 0
+
 	def select(self):
 		if self.outputs() == 0:
 			raise IndexError
@@ -206,9 +209,6 @@ def main():
 
 def normalise(splitters):
 
-	for splitter in splitters:
-		splitter.selectindex = 0		# For determinism
-
 	while 1:
 
 		changes = False
@@ -245,6 +245,9 @@ def normalise(splitters):
 
 
 def get_scores(roots, splitters, termini):
+
+	for splitter in splitters:
+		splitter.reset_selector()
 
 	scores = [0 for terminus in termini]
 
